@@ -3,6 +3,7 @@ import { IUser, User } from '../models/database/user'
 import 'dotenv/config'
 import RefreshToken from '~/models/database/refreshToken'
 import PublicKey from '~/models/database/publicKey'
+import { Follow } from '~/models/database/follow'
 export class Database {
   private static instance: Database
   private client: MongoClient
@@ -39,6 +40,10 @@ export class Database {
 
   get publicKey(): Collection<PublicKey> {
     return this.db.collection(process.env.PUBLIC_KEY as string)
+  }
+
+  get follow(): Collection<Follow> {
+    return this.db.collection(process.env.FOLLOW as string)
   }
 }
 

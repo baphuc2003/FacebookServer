@@ -14,5 +14,6 @@ export enum TokenType {
   RefreshToken = 'RefreshToken',
   AccessToken = 'AccessToken',
   PublicKey = 'PublicKey',
-  EmailVerifyToken = 'EmailVerifyToken'
+  EmailVerifyToken = 'EmailVerifyToken',
+  ForgotPasswordToken = 'ForgotPasswordToken'
 }

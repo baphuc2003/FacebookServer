@@ -84,3 +84,17 @@ export const sendVerifyRegisterEmail = (
     template.replace('{{link}}', `${process.env.CLIENT_URL}/verify-your-email?token=${token}&user_id=${user_id}`)
   )
 }
+
+const forgotPasswordTemplate = fs.readFileSync(path.resolve('src/template/forgotPassword.html'), 'utf8')
+export const sendForgotPasswordEmail = (
+  toAddress: string,
+  token: string,
+  user_id: string,
+  template: string = forgotPasswordTemplate
+) => {
+  return sendVerifyEmail(
+    toAddress,
+    'Reset the password',
+    template.replace('{{link}}', `${process.env.CLIENT_URL}/reset-password?token=${token}&user_id=${user_id}`)
+  )
+}

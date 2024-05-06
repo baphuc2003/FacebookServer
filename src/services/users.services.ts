@@ -7,12 +7,15 @@ import { StatusActivity, TokenType } from '~/constants/enum'
 import RefreshToken from '~/models/database/refreshToken'
 import PublicKey from '~/models/database/publicKey'
 import { hashPassword } from '~/utils/bcrypt'
-import { sendVerifyRegisterEmail } from '~/utils/email'
+import { sendForgotPasswordEmail, sendVerifyRegisterEmail } from '~/utils/email'
 import { ErrorWithStatus } from '~/models/Errors'
+import { Follow } from '~/models/database/follow'
+import _ from 'lodash'
 // import { sendVerifyEmail } from '~/utils/email'
 
 class UsersServices {
   async register(payload: IUser) {
+    console.log('check User ', payload)
     const user_id = new ObjectId()
     const { privateKey, publicKey } = generateKey()
     //Create email_verify_token
@@ -93,7 +96,7 @@ class UsersServices {
     //   `<h1>Verify your email</h1>`,
     //   `${process.env.CLIENT_URL}/verify-your-email?token=${email_verify_token}`
     // )
-    sendVerifyRegisterEmail('conganuong999@gmail.com', email_verify_token, user_id.toString())
+    sendVerifyRegisterEmail(`${payload.email}`, email_verify_token, user_id.toString())
 
     return {
       access_token,
@@ -130,9 +133,13 @@ class UsersServices {
 
     //update new publicKey and refreshToken
     try {
-      const updatedDocuments = await Promise.all([
-        database.refreshToken.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: refresh_token } }),
-        database.publicKey.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: publicKey } })
+      // const updatedDocuments = await Promise.all([
+      //   database.refreshToken.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: refresh_token } }),
+      //   database.publicKey.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: publicKey } })
+      // ])
+      await Promise.all([
+        database.refreshToken.insertOne(new RefreshToken({ user_id: new ObjectId(user_id), token: refresh_token })),
+        database.publicKey.insertOne(new PublicKey({ user_id: new ObjectId(user_id), token: publicKey }))
       ])
     } catch (error) {
       console.log(error)
@@ -145,9 +152,19 @@ class UsersServices {
     }
   }
 
+  async logout(user_id: string) {
+    // delete publicKey and refresh token in database
+    await Promise.all([
+      database.publicKey.deleteOne({ user_id: new ObjectId(user_id) }),
+      database.refreshToken.deleteOne({ user_id: new ObjectId(user_id) })
+    ])
+    return 'Logout successfully!'
+  }
+
   async checkEmailExist(email: string) {
     const user = await database.users.findOne({ email })
-    return Boolean(user)
+    console.log('check 150 ', user)
+    return user
   }
 
   async emailVerify(user_id: string) {
@@ -233,6 +250,119 @@ class UsersServices {
       access_token,
       refresh_token
     }
+  }
+
+  async forgotPassword(user_id: string, email: string) {
+    const { privateKey, publicKey } = generateKey()
+    const forgotPasswordToken = generateToken({
+      payload: {
+        user_id: user_id,
+        token_type: TokenType.ForgotPasswordToken
+      },
+      privateKey,
+      option: {
+        expiresIn: '1h',
+        algorithm: 'RS256'
+      }
+    })
+    //update new publicKey and forgotPasswordToken in database
+    await Promise.all([
+      database.publicKey.findOneAndUpdate(
+        {
+          user_id: new ObjectId(user_id)
+        },
+        {
+          $set: {
+            token: publicKey,
+            updated_at: new Date()
+          }
+        },
+        { returnDocument: 'after' }
+      ),
+      database.users.findOneAndUpdate(
+        {
+          _id: new ObjectId(user_id)
+        },
+        {
+          $set: {
+            forgotPasswordToken: forgotPasswordToken
+          }
+        },
+        { returnDocument: 'after' }
+      )
+    ])
+
+    sendForgotPasswordEmail(email, forgotPasswordToken, user_id)
+  }
+
+  async resetPassword(password: string, user_id: string) {
+    //hash password
+    const hash_password = await hashPassword(password)
+    //update new password and delete forgotPasswordToken
+
+    const result = await database.users.findOneAndUpdate(
+      {
+        _id: new ObjectId(user_id)
+      },
+      {
+        $set: {
+          password: hash_password,
+          forgotPasswordToken: ''
+        }
+      },
+      { returnDocument: 'after' }
+    )
+  }
+
+  async changePassword(userId: string, password: string) {
+    const hash_password = await hashPassword(password)
+    await database.users.findOneAndUpdate(
+      { _id: new ObjectId(userId) },
+      {
+        $set: {
+          password: hash_password
+        }
+      }
+    )
+  }
+
+  async followUser(user_id: string, followed_user_id: string) {
+    //if document follow is exist after then return
+    const isFollow = await database.follow.findOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+    if (isFollow) {
+      return 'Follow successfully!'
+    }
+    await database.follow.insertOne(
+      new Follow({
+        user_id: new ObjectId(user_id),
+        followed_user_id: new ObjectId(followed_user_id)
+      })
+    )
+    return 'Follow successfully!'
+  }
+
+  async unFollowUser(user_id: string, followed_user_id: string) {
+    await database.follow.deleteOne({
+      user_id: new ObjectId(user_id),
+      followed_user_id: new ObjectId(followed_user_id)
+    })
+    return 'Unfollow user successfully!'
+  }
+
+  async userProfile(userId: string) {
+    const user = await database.users.findOne({
+      _id: new ObjectId(userId)
+    })
+    if (user == null) {
+      throw new ErrorWithStatus({
+        status: 404,
+        message: 'User not found!'
+      })
+    }
+    return _.omit(user, ['password', 'emailVerifyToken', 'forgotPasswordToken'])
   }
 }
 

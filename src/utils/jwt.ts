@@ -29,3 +29,19 @@ export const verifyEmailToken = ({ emailToken, secretKey }: { emailToken: string
     })
   })
 }
+
+export const decodeToken = ({ token, secretKey }: { token: string; secretKey: string }) => {
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, secretKey, (err, decoded) => {
+      if (err) {
+        return reject(
+          new ErrorWithStatus({
+            status: 401,
+            message: 'Decoded token is failed'
+          })
+        )
+      }
+      resolve(decoded)
+    })
+  })
+}
