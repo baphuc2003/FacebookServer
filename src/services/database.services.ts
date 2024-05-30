@@ -4,6 +4,11 @@ import 'dotenv/config'
 import RefreshToken from '~/models/database/refreshToken'
 import PublicKey from '~/models/database/publicKey'
 import { Follow } from '~/models/database/follow'
+import { Post } from '~/models/database/post'
+import { HashTag } from '~/models/database/hashtag'
+import { Bookmark } from '~/models/database/bookmark'
+import { Like } from '~/models/database/like'
+import { Conversation } from '~/models/database/conversation'
 export class Database {
   private static instance: Database
   private client: MongoClient
@@ -26,7 +31,7 @@ export class Database {
       await this.db.command({ ping: 1 })
       console.log('Connected to MongoDb successfully!')
     } catch (error) {
-      console.log('Connect to DB failed!!')
+      console.log('Connect to DB failed!!', error)
     }
   }
 
@@ -44,6 +49,26 @@ export class Database {
 
   get follow(): Collection<Follow> {
     return this.db.collection(process.env.FOLLOW as string)
+  }
+
+  get post(): Collection<Post> {
+    return this.db.collection(process.env.POST as string)
+  }
+
+  get hashTags(): Collection<HashTag> {
+    return this.db.collection(process.env.HASHTAG as string)
+  }
+
+  get bookMark(): Collection<Bookmark> {
+    return this.db.collection(process.env.BOOKMARK as string)
+  }
+
+  get like(): Collection<Like> {
+    return this.db.collection(process.env.LIKE as string)
+  }
+
+  get conversation(): Collection<Conversation> {
+    return this.db.collection(process.env.CONVERSATION as string)
   }
 }
 

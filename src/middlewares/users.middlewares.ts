@@ -1,4 +1,4 @@
-import { checkSchema } from 'express-validator'
+import { ValidationChain, checkSchema } from 'express-validator'
 import { ErrorWithStatus } from '~/models/Errors'
 import userService from '~/services/users.services'
 import bcrypt from 'bcrypt'
@@ -6,6 +6,9 @@ import database from '~/services/database.services'
 import { decodeToken, verifyEmailToken } from '~/utils/jwt'
 import { ObjectId } from 'mongodb'
 import { StatusActivity } from '~/constants/enum'
+import { Request, Response, NextFunction } from 'express'
+import { RunnableValidationChains } from 'express-validator/src/middlewares/schema'
+import { getDataCookie } from '~/utils/cookie'
 
 export const registerValidator = checkSchema(
   {
@@ -140,6 +143,36 @@ export const userIdValidator = checkSchema(
     user_id: {
       custom: {
         options: async (value, { req }) => {
+          const dataCookie: string = req.headers?.cookie
+          const user_id = getDataCookie(dataCookie)['user_id']
+          if (!user_id) {
+            throw new ErrorWithStatus({
+              status: 401,
+              message: 'User id is required'
+            })
+          }
+          const user = await database.users.findOne({ _id: new ObjectId(user_id) })
+          if (!user) {
+            throw new ErrorWithStatus({
+              status: 404,
+              message: 'User not found!'
+            })
+          }
+          req.user_id = user_id
+          return true
+        }
+      }
+    }
+  },
+  ['headers']
+)
+
+export const userIdHeaderValidator = checkSchema(
+  {
+    user_id: {
+      custom: {
+        options: async (value, { req }) => {
+          console.log('check 175 ', value)
           if (!value) {
             throw new ErrorWithStatus({
               status: 401,
@@ -159,16 +192,46 @@ export const userIdValidator = checkSchema(
       }
     }
   },
-  ['body']
+  ['headers']
+)
+
+export const userIdParamValidator = checkSchema(
+  {
+    userId: {
+      custom: {
+        options: async (value, { req }) => {
+          if (!value) {
+            throw new ErrorWithStatus({
+              status: 401,
+              message: 'User id is required'
+            })
+          }
+          const user = await database.users.findOne({ _id: new ObjectId(value) })
+          if (user == null) {
+            throw new ErrorWithStatus({
+              status: 404,
+              message: 'User not found!'
+            })
+          }
+          req.user_id = value
+          return true
+        }
+      }
+    }
+  },
+  ['params']
 )
 
 export const emailVerifyTokenValidator = checkSchema(
   {
-    token: {
+    email_verify_token: {
       trim: true,
       custom: {
         options: async (value: string, { req }) => {
-          const user_id = new ObjectId(req.user_id)
+          console
+          const dataCookie: string = req.headers?.cookie
+          const userId = getDataCookie(dataCookie)['user_id']
+          const user_id = new ObjectId(userId)
 
           //get public key
           const publicKey = await database.publicKey.findOne({ user_id: user_id })
@@ -264,27 +327,29 @@ export const changePasswordValidator = checkSchema(
   ['body']
 )
 
-export const checkEmailExist = checkSchema({
-  email: {
-    custom: {
-      options: async (value, { req }) => {
-        if (!value) {
-          throw new Error('Email is not empty!')
+export const checkEmailExist = checkSchema(
+  {
+    email: {
+      custom: {
+        options: async (value, { req }) => {
+          if (!value) {
+            throw new Error('Email is not empty!')
+          }
+          const isExist = await userService.checkEmailExist(value)
+          if (!isExist) {
+            throw new ErrorWithStatus({
+              status: 404,
+              message: "Email isn't exist!"
+            })
+          }
+          req.isEmail = isExist
+          return true
         }
-        const isExist = await userService.checkEmailExist(value)
-        // console.log('check 227 ', isExist)
-        if (!isExist) {
-          throw new ErrorWithStatus({
-            status: 404,
-            message: "Email isn't exist!"
-          })
-        }
-        req.isEmail = isExist
-        return true
       }
     }
-  }
-})
+  },
+  ['body']
+)
 
 export const passwordValidator = checkSchema(
   {
@@ -316,17 +381,19 @@ export const verifiedUserValidator = checkSchema(
     user_id: {
       custom: {
         options: async (value, { req }) => {
-          if (!value) {
+          const dataCookie: string = req.headers?.cookie
+          const user_id = getDataCookie(dataCookie)['user_id']
+          if (!user_id) {
             throw new ErrorWithStatus({
               status: 401,
               message: 'User id is not empty'
             })
           }
-          const user = await database.users.findOne({ _id: new ObjectId(value) })
+          const user = await database.users.findOne({ _id: new ObjectId(user_id) })
           if (!user) {
             throw new ErrorWithStatus({
               status: 404,
-              message: 'User not found!'
+              message: 'User not found!!'
             })
           }
 
@@ -341,7 +408,7 @@ export const verifiedUserValidator = checkSchema(
       }
     }
   },
-  ['body']
+  ['headers']
 )
 
 export const followValidator = checkSchema(
@@ -375,7 +442,8 @@ export const accessTokenValidator = checkSchema(
     authorization: {
       custom: {
         options: async (value, { req }) => {
-          const user_id = req.user_id
+          const dataCookie: string = req.headers?.cookie
+          const user_id = getDataCookie(dataCookie)['user_id']
           //get publicKey of user_id
           const publicKey = await database.publicKey.findOne({ user_id: new ObjectId(user_id) })
           if (!publicKey) {
@@ -384,17 +452,17 @@ export const accessTokenValidator = checkSchema(
               message: 'Public key not found!'
             })
           }
-          if (!value) {
+          const accessToken = decodeURIComponent(getDataCookie(dataCookie)['accessToken']).split(' ')[1]
+          if (!accessToken) {
             throw new ErrorWithStatus({
               status: 401,
               message: 'Access token is not empty!'
             })
           }
-          const token = value.split(' ')[1]
           //decoded access token
-          const decoded_access_token = await decodeToken({ token: token, secretKey: publicKey.token })
-          console.log('check 288 ', decoded_access_token)
+          const decoded_access_token = await decodeToken({ token: accessToken, secretKey: publicKey.token })
           req.decoded_access_token = decoded_access_token
+          return true
         }
       }
     }
@@ -407,15 +475,17 @@ export const refreshTokenValidator = checkSchema(
     refreshToken: {
       custom: {
         options: async (value, { req }) => {
-          const userId = req.user_id
-          if (!value) {
+          const dataCookie: string = req.headers?.cookie
+          const user_id = getDataCookie(dataCookie)['user_id']
+          const refreshToken = getDataCookie(dataCookie)['refreshToken']
+          if (!refreshToken) {
             throw new ErrorWithStatus({
               status: 401,
               message: 'Refresh token is not empty!'
             })
           }
           //get public key in database
-          const publicKey = await database.publicKey.findOne({ user_id: new ObjectId(userId) })
+          const publicKey = await database.publicKey.findOne({ user_id: new ObjectId(user_id) })
           if (!publicKey) {
             throw new ErrorWithStatus({
               status: 404,
@@ -423,7 +493,7 @@ export const refreshTokenValidator = checkSchema(
             })
           }
           //decoded_refresh_token in here
-          const decoded_refresh_token = await decodeToken({ token: value, secretKey: publicKey.token })
+          const decoded_refresh_token = await decodeToken({ token: refreshToken, secretKey: publicKey.token })
           req.decoded_refresh_token = decoded_refresh_token
           return true
         }
@@ -432,3 +502,52 @@ export const refreshTokenValidator = checkSchema(
   },
   ['body']
 )
+
+export const isUserLoggedValidator = (middleware: (req: Request, res: Response, next: NextFunction) => void) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const dataCookie = req.headers.cookie as string
+    const isExistAccessToken = getDataCookie(dataCookie)['accessToken']
+    if (isExistAccessToken) {
+      return middleware(req, res, next)
+    }
+    next()
+  }
+}
+
+export const checkForgotPasswordTokenValidator = checkSchema({
+  forgot_password_token: {
+    custom: {
+      options: async (value, { req }) => {
+        const user_id = req.headers?.user_id as string
+        if (!value) {
+          throw new ErrorWithStatus({
+            status: 401,
+            message: 'Forgot password token is not empty'
+          })
+        }
+        //find token in database
+        const user = await database.users.findOne({ _id: new ObjectId(user_id) })
+        if (user?.forgotPasswordToken !== value) {
+          throw new ErrorWithStatus({
+            status: 404,
+            message: 'Forgot password invalid'
+          })
+        }
+        //get public key
+        const publicKey = await database.publicKey.findOne({ user_id: new ObjectId(user_id) })
+        if (!publicKey) {
+          throw new ErrorWithStatus({
+            status: 401,
+            message: 'User id is not defined!'
+          })
+        }
+        const decoded_forgot_password_token = await verifyEmailToken({
+          emailToken: value,
+          secretKey: publicKey?.token as string
+        })
+
+        req.decoded_forgot_password_token = decoded_forgot_password_token
+      }
+    }
+  }
+})

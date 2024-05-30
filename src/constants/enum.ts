@@ -10,6 +10,11 @@ export enum StatusActivity {
   Banned = 'Banned'
 }
 
+export enum MediaType {
+  Image = 'Image',
+  Video = 'Video'
+}
+
 export enum TokenType {
   RefreshToken = 'RefreshToken',
   AccessToken = 'AccessToken',

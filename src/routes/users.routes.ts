@@ -4,6 +4,8 @@ import {
   emailVerifyController,
   followController,
   forgotPasswordController,
+  getAllUser,
+  getProfilecontroller,
   loginController,
   logoutController,
   registerController,
@@ -15,6 +17,7 @@ import {
   accessTokenValidator,
   changePasswordValidator,
   checkEmailExist,
+  checkForgotPasswordTokenValidator,
   emailVerifyTokenValidator,
   followValidator,
   forgotPasswordValidator,
@@ -22,6 +25,8 @@ import {
   passwordValidator,
   refreshTokenValidator,
   registerValidator,
+  userIdHeaderValidator,
+  userIdParamValidator,
   userIdValidator,
   verifiedUserValidator
 } from '~/middlewares/users.middlewares'
@@ -35,7 +40,6 @@ usersRouter.post('/login', validate(loginValidator), wrapAsync(loginController))
 
 usersRouter.post(
   '/logout',
-  validate(userIdValidator),
   validate(accessTokenValidator),
   validate(refreshTokenValidator),
   wrapAsync(logoutController)
@@ -52,9 +56,8 @@ usersRouter.post('/forgot-password', validate(checkEmailExist), wrapAsync(forgot
 
 usersRouter.put(
   '/change-password',
-  validate(userIdValidator),
-  validate(accessTokenValidator),
-  validate(verifiedUserValidator),
+  validate(userIdHeaderValidator),
+  validate(checkForgotPasswordTokenValidator),
   validate(changePasswordValidator),
   wrapAsync(changePasswordController)
 )
@@ -83,6 +86,15 @@ usersRouter.post(
   wrapAsync(unFollowController)
 )
 
-usersRouter.get('/:userId', wrapAsync(userProfileController))
+usersRouter.get(
+  '/me',
+  validate(accessTokenValidator),
+  validate(verifiedUserValidator),
+  wrapAsync(userProfileController)
+)
+
+usersRouter.get('/get-profile/:userId', validate(userIdParamValidator), wrapAsync(getProfilecontroller))
+
+usersRouter.get('/get-all-user', wrapAsync(getAllUser))
 
 export default usersRouter

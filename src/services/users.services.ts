@@ -15,7 +15,6 @@ import _ from 'lodash'
 
 class UsersServices {
   async register(payload: IUser) {
-    console.log('check User ', payload)
     const user_id = new ObjectId()
     const { privateKey, publicKey } = generateKey()
     //Create email_verify_token
@@ -100,7 +99,8 @@ class UsersServices {
 
     return {
       access_token,
-      refresh_token
+      refresh_token,
+      user_id: user_id.toString()
     }
   }
 
@@ -133,13 +133,17 @@ class UsersServices {
 
     //update new publicKey and refreshToken
     try {
-      // const updatedDocuments = await Promise.all([
-      //   database.refreshToken.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: refresh_token } }),
-      //   database.publicKey.findOneAndUpdate({ user_id: new ObjectId(user_id) }, { $set: { token: publicKey } })
-      // ])
-      await Promise.all([
-        database.refreshToken.insertOne(new RefreshToken({ user_id: new ObjectId(user_id), token: refresh_token })),
-        database.publicKey.insertOne(new PublicKey({ user_id: new ObjectId(user_id), token: publicKey }))
+      const updatedDocuments = await Promise.all([
+        database.refreshToken.findOneAndUpdate(
+          { user_id: new ObjectId(user_id) },
+          { $set: { token: refresh_token } },
+          { returnDocument: 'after' }
+        ),
+        database.publicKey.findOneAndUpdate(
+          { user_id: new ObjectId(user_id) },
+          { $set: { token: publicKey } },
+          { returnDocument: 'after' }
+        )
       ])
     } catch (error) {
       console.log(error)
@@ -153,22 +157,18 @@ class UsersServices {
   }
 
   async logout(user_id: string) {
-    // delete publicKey and refresh token in database
-    await Promise.all([
-      database.publicKey.deleteOne({ user_id: new ObjectId(user_id) }),
-      database.refreshToken.deleteOne({ user_id: new ObjectId(user_id) })
-    ])
     return 'Logout successfully!'
   }
 
   async checkEmailExist(email: string) {
     const user = await database.users.findOne({ email })
-    console.log('check 150 ', user)
     return user
   }
 
   async emailVerify(user_id: string) {
+    console.log('check 1700000000')
     const user = await database.users.findOne({ _id: new ObjectId(user_id) })
+    console.log('check 999 ', user)
     if (!user) {
       throw new ErrorWithStatus({
         status: 401,
@@ -320,7 +320,8 @@ class UsersServices {
       { _id: new ObjectId(userId) },
       {
         $set: {
-          password: hash_password
+          password: hash_password,
+          forgotPasswordToken: ''
         }
       }
     )
@@ -353,6 +354,19 @@ class UsersServices {
   }
 
   async userProfile(userId: string) {
+    const user = await database.users.findOne({
+      _id: new ObjectId(userId)
+    })
+    if (user == null) {
+      throw new ErrorWithStatus({
+        status: 404,
+        message: 'User not found!'
+      })
+    }
+    return _.omit(user, ['password', 'emailVerifyToken', 'forgotPasswordToken'])
+  }
+
+  async getProfile(userId: string) {
     const user = await database.users.findOne({
       _id: new ObjectId(userId)
     })
