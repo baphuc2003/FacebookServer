@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { likeController, unlikeController } from '~/controllers/like.controllers'
+import { postIdValidator } from '~/middlewares/post.middlewares'
 import { accessTokenValidator, userIdValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import { wrapAsync } from '~/utils/handlers'
 import { validate } from '~/utils/validation'
@@ -11,6 +12,7 @@ likeRouter.post(
   validate(userIdValidator),
   validate(accessTokenValidator),
   validate(verifiedUserValidator),
+  validate(postIdValidator),
   wrapAsync(likeController)
 )
 
@@ -19,6 +21,7 @@ likeRouter.delete(
   validate(userIdValidator),
   validate(accessTokenValidator),
   validate(verifiedUserValidator),
+  validate(postIdValidator),
   wrapAsync(unlikeController)
 )
 

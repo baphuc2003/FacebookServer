@@ -1,6 +1,17 @@
 import { Router } from 'express'
-import { createPostController, getPostController } from '~/controllers/tweets.controllers'
-import { createPostValidator, postCircleValidator, postIdValidator } from '~/middlewares/post.middlewares'
+import {
+  createPostController,
+  getNewPostController,
+  getPostController,
+  getPostchildrenController
+} from '~/controllers/tweets.controllers'
+import {
+  createPostValidator,
+  idPostValidator,
+  paginationValidator,
+  postCircleValidator,
+  postIdValidator
+} from '~/middlewares/post.middlewares'
 import {
   accessTokenValidator,
   isUserLoggedValidator,
@@ -18,15 +29,26 @@ postRouter.post(
   validate(accessTokenValidator),
   validate(verifiedUserValidator),
   validate(createPostValidator),
+  validate(idPostValidator),
   wrapAsync(createPostController)
 )
 
 postRouter.get(
-  '/:post_id',
+  '/children/:post_id',
   validate(postIdValidator),
   isUserLoggedValidator(validate(userIdValidator)),
   isUserLoggedValidator(validate(accessTokenValidator)),
   postCircleValidator,
-  wrapAsync(getPostController)
+  wrapAsync(getPostchildrenController)
 )
+
+postRouter.get(
+  '/new-post',
+  validate(userIdValidator),
+  validate(accessTokenValidator),
+  validate(paginationValidator),
+  wrapAsync(getNewPostController)
+)
+
+// postRouter.get('/get-list-post', wrapAsync(getListPostController))
 export default postRouter

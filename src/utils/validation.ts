@@ -14,11 +14,9 @@ export const validate = (validations: RunnableValidationChains<ValidationChain>)
       return next()
     }
     const errorObject = errors.mapped()
-    console.log('check inline 17 ', errorObject)
     for (const key in errorObject) {
       const { msg } = errorObject[key]
       if (msg instanceof ErrorWithStatus && msg.status !== httpStatus.UNPROCESSABLE_ENTITY) {
-        console.log('check inline 22 ', msg)
         return next(msg)
       }
       entityError.errors[key] = errorObject[key]
