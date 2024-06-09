@@ -5,8 +5,8 @@ import fs from 'fs'
 const s3 = new S3({
   region: 'ap-southeast-1',
   credentials: {
-    accessKeyId: 'AKIA6LZIFTJ25Y2CNIRE',
-    secretAccessKey: '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'
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string
   }
 })
 
