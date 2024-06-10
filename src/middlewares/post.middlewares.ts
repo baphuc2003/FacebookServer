@@ -117,7 +117,8 @@ export const createPostValidator = checkSchema(
 
           if (
             type.toLowerCase() === IPostType.Post.toLowerCase() &&
-            audience.toLowerCase() === IPostAudience.Everyone.toLowerCase()
+            audience.toLowerCase() === IPostAudience.Everyone.toLowerCase() &&
+            value.length > 0
           ) {
             throw new ErrorWithStatus({
               status: 400,
@@ -369,7 +370,7 @@ export const postIdValidator = checkSchema(
           )[0]
           if (!post) {
             throw new ErrorWithStatus({
-              status: 401,
+              status: 400,
               message: 'Not found the post'
             })
           }

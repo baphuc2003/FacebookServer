@@ -185,6 +185,7 @@ class PostServices {
         { $limit: limit }
       ])
       .toArray()
+
     //imcrease view for post
     const ids = result.map((item) => item._id as ObjectId)
     await database.post.updateMany(
@@ -222,47 +223,14 @@ class PostServices {
         {
           $match: {
             user_id: {
-              $in: [new ObjectId(id)]
-            }
-          }
-        },
-        {
-          $lookup: {
-            from: 'hashtags',
-            localField: 'hashtags',
-            foreignField: '_id',
-            as: 'hashtags'
-          }
-        },
-        {
-          $lookup: {
-            from: 'mentions',
-            localField: 'mentions',
-            foreignField: '_id',
-            as: 'mentions'
-          }
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user_id',
-            foreignField: '_id',
-            as: 'user_id'
-          }
-        },
-        {
-          $project: {
-            user_id: {
-              password: 0,
-              emailVerifyToken: 0,
-              forgotPasswordToken: 0
+              $in: [new ObjectId('663a30a0569aba6e68abe110')]
             }
           }
         },
         {
           $lookup: {
             from: 'follow',
-            localField: 'user_id._id',
+            localField: 'user_id',
             foreignField: 'user_id',
             as: 'follow'
           }
@@ -279,10 +247,24 @@ class PostServices {
           $match: {
             $or: [
               {
-                audience: 'everyone'
+                $and: [
+                  {
+                    audience: 'everyone'
+                  },
+                  {
+                    type: 'post'
+                  }
+                ]
               },
               {
-                audience: 'postcircle'
+                $and: [
+                  {
+                    audience: 'postcircle'
+                  },
+                  {
+                    type: 'post'
+                  }
+                ]
               }
             ]
           }
@@ -329,7 +311,14 @@ class PostServices {
                 cond: {
                   $or: [
                     {
-                      $eq: ['$$item.audience', 'everyone']
+                      $and: [
+                        {
+                          $eq: ['$$item.audience', 'everyone']
+                        },
+                        {
+                          $eq: ['$$item.type', 'post']
+                        }
+                      ]
                     },
                     {
                       $and: [
@@ -337,7 +326,17 @@ class PostServices {
                           $eq: ['$$item.audience', 'postcircle']
                         },
                         {
-                          $in: [new ObjectId(id), '$$item.post_circle']
+                          $eq: ['$$item.type', 'post']
+                        }
+                      ]
+                    },
+                    {
+                      $and: [
+                        {
+                          $eq: ['$$item.audience', 'postcircle']
+                        },
+                        {
+                          $in: [new ObjectId('6662e92ba20f67e1064008f1'), '$$item.post_circle']
                         }
                       ]
                     }
@@ -375,8 +374,8 @@ class PostServices {
         {
           $group: {
             _id: null,
-            list_new_feed: {
-              $push: '$$ROOT'
+            item_new_feed: {
+              $push: '$new_feed'
             }
           }
         },
@@ -384,10 +383,81 @@ class PostServices {
           $project: {
             _id: 0
           }
+        },
+        {
+          $unwind: {
+            path: '$item_new_feed',
+            includeArrayIndex: 'index',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'item_new_feed.user_id',
+            foreignField: '_id',
+            as: 'item_new_feed.user_id'
+          }
+        },
+        {
+          $project: {
+            'item_new_feed.user_id.password': 0,
+            'item_new_feed.user_id.emailVerifyToken': 0,
+            'item_new_feed.user_id.forgotPasswordToken': 0
+          }
+        },
+        {
+          $lookup: {
+            from: 'hashtags',
+            localField: 'item_new_feed.hashtags',
+            foreignField: '_id',
+            as: 'item_new_feed.hashtags'
+          }
+        },
+        {
+          $lookup: {
+            from: 'mentions',
+            localField: 'item_new_feed.mentions',
+            foreignField: '_id',
+            as: 'item_new_feed.mentions'
+          }
+        },
+        {
+          $facet: {
+            total_new_feed: [
+              {
+                $count: 'count'
+              }
+            ],
+            // list_new_feed: [],
+            paginatedResults: [{ $skip: limit * (page - 1) }, { $limit: limit }]
+          }
         }
       ])
       .toArray()
 
+    const ids = result[0].paginatedResults.map((item: any) => {
+      return item?.item_new_feed?._id as ObjectId
+    })
+
+    await database.post.updateMany(
+      {
+        _id: {
+          $in: ids
+        }
+      },
+      {
+        $inc: {
+          user_view: 1
+        }
+      }
+    )
+
+    result[0].paginatedResults.forEach((item: any) => {
+      if (item?.item_new_feed?.user_view !== undefined) {
+        return (item.item_new_feed.user_view += 1)
+      }
+    })
     return {
       result
     }

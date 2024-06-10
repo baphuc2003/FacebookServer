@@ -36,13 +36,14 @@ export const getNewPostController = async (req: Request, res: Response) => {
   const limit = Number(req.query.limit)
   const user_id = req.user_id as string
   const result = await postService.getNewPost({ id: user_id, limit, page })
-  const newFeed = result.result[0]?.list_new_feed
-  console.log('check 39 ', result.result[0].list_new_feed)
+  const newFeed = result.result[0].paginatedResults
+  const total_page = result.result[0].total_new_feed[0].count
+  // console.log('check 40 ', result)
   return res.status(200).json({
     message: 'Get new post successfully',
     limit,
     page,
-    total_page: newFeed.length,
+    total_page: Math.ceil(total_page / limit),
     newFeed
   })
 }
@@ -59,10 +60,3 @@ export const getPostController = async (req: Request, res: Response) => {
     post
   })
 }
-
-// export const increaseViewPostController = async (req: Request, res: Response) => {
-//   const result = await postService.increaseView()
-//   return res.status(200).json({
-//     message: 'Increase view of the post sucessfully!'
-//   })
-// }
